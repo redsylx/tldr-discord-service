@@ -11,12 +11,7 @@ push:
 	docker push $(IMAGE):latest
 
 deploy:
-	gcloud run deploy tldr-discord-service \
-		--image $(IMAGE):$(VERSION) \
-		--region asia-southeast1 \
-		--max-instances 1 \
-		--no-cpu-throttling \
-		--set-env-vars "GCS_BUCKET_NAME=...,DISCORD_WEBHOOK_URL=..."
+	bash deploy.sh
 
 test:
 	go test ./... -v -count=1
