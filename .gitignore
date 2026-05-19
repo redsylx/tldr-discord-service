@@ -13,3 +13,6 @@
 # Env
 .env
 .env.local
+
+service-account.json
+run.sh
