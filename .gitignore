@@ -1,0 +1,15 @@
+.devcontainer
+
+# Go
+/tldr-discord-service
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+.env.local
