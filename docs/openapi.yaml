@@ -1,0 +1,149 @@
+openapi: "3.1.0"
+info:
+  title: TLDR Discord Service
+  description: |
+    Service untuk mengirim hasil pipeline TLDR ke Discord via webhook,
+    serta membuat forum thread baru di Discord.
+  version: "1.0.0"
+
+servers:
+  - url: https://tldr-redsylx-discord-service-800152705007.asia-southeast2.run.app
+    description: Production
+
+paths:
+  /webhook:
+    post:
+      summary: Kirim file hasil pipeline ke thread Discord
+      description: |
+        Membaca file dari GCS (teks untuk success, JSON untuk failed)
+        dan mengirimnya ke thread Discord via webhook.
+      parameters:
+        - name: file
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Path file di GCS bucket
+          example: results/success-2025-01-01.txt
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [success, failed]
+          description: Tipe hasil pipeline
+        - name: thread_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: ID thread Discord tujuan
+          example: "1511342083150053463"
+      responses:
+        "200":
+          description: Pesan berhasil dikirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+        "400":
+          description: Request tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Gagal membaca file atau mengirim ke Discord
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /forum:
+    post:
+      summary: Buat forum thread baru di Discord
+      description: |
+        Membuat forum thread baru di Discord via webhook.
+        Thread akan berisi embed dengan title, url, description,
+        estimated reading time, dan tags yang terdaftar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateForumRequest"
+      responses:
+        "200":
+          description: Forum thread berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForumResponse"
+        "400":
+          description: Request tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Gagal membuat thread di Discord
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    CreateForumRequest:
+      type: object
+      required: [title, desc]
+      properties:
+        title:
+          type: string
+          description: Nama thread (thread_name)
+          example: "IPO Anthropic"
+        desc:
+          type: string
+          description: Konten first post
+          example: "Anthropic dikabarkan bersiap IPO, kita bahas dampaknya."
+        url:
+          type: string
+          description: URL yang akan ditautkan ke judul embed
+          example: "https://example.com/article"
+        read:
+          type: integer
+          description: Estimasi waktu baca dalam menit
+          minimum: 0
+          example: 5
+        tags:
+          type: array
+          description: |
+            Array ID tag Discord (snowflake).
+            Maksimal 4 tag, harus sesuai preset yang terdaftar.
+          items:
+            type: string
+            pattern: "^[0-9]{17,20}$"
+          maxItems: 4
+          example:
+            - "1511311266935738478"
+            - "1511311288922275840"
+
+    ForumResponse:
+      type: object
+      properties:
+        thread_id:
+          type: string
+          description: ID thread Discord yang baru dibuat
+          example: "1511342083150053463"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Pesan error
+      required: [error]
