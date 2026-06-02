@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/redsylx/tldr-discord-service/internal/model"
 )
 
 type Client interface {
-	SendTextMessage(ctx context.Context, content string) error
-	SendEmbed(ctx context.Context, embed model.Embed) error
+	SendTextMessage(ctx context.Context, content string, threadID string) error
+	SendEmbed(ctx context.Context, embed model.Embed, threadID string) error
 }
 
 func NewClient(webhookURL string, delayMs int) Client {
@@ -30,17 +31,17 @@ type discordClient struct {
 	delay      time.Duration
 }
 
-func (c *discordClient) SendTextMessage(ctx context.Context, content string) error {
+func (c *discordClient) SendTextMessage(ctx context.Context, content string, threadID string) error {
 	payload := map[string]string{"content": content}
-	return c.send(ctx, payload)
+	return c.send(ctx, payload, threadID)
 }
 
-func (c *discordClient) SendEmbed(ctx context.Context, embed model.Embed) error {
+func (c *discordClient) SendEmbed(ctx context.Context, embed model.Embed, threadID string) error {
 	payload := map[string]any{"embeds": []model.Embed{embed}}
-	return c.send(ctx, payload)
+	return c.send(ctx, payload, threadID)
 }
 
-func (c *discordClient) send(ctx context.Context, payload any) error {
+func (c *discordClient) send(ctx context.Context, payload any, threadID string) error {
 	defer func() {
 		if c.delay > 0 {
 			time.Sleep(c.delay)
@@ -52,7 +53,18 @@ func (c *discordClient) send(ctx context.Context, payload any) error {
 		return fmt.Errorf("discord: marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.webhookURL, bytes.NewReader(body))
+	urlStr := c.webhookURL
+	if threadID != "" {
+		u, parseErr := url.Parse(c.webhookURL)
+		if parseErr == nil {
+			q := u.Query()
+			q.Set("thread_id", threadID)
+			u.RawQuery = q.Encode()
+			urlStr = u.String()
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("discord: create request: %w", err)
 	}

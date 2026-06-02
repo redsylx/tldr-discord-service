@@ -29,9 +29,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	file := r.URL.Query().Get("file")
 	typ := r.URL.Query().Get("type")
+	threadID := r.URL.Query().Get("thread_id")
 
 	if file == "" {
 		respondError(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	if threadID == "" {
+		respondError(w, http.StatusBadRequest, "thread_id is required")
 		return
 	}
 	if typ != "success" && typ != "failed" {
@@ -41,9 +46,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	if typ == "success" {
-		err = h.handleSuccess(r.Context(), file)
+		err = h.handleSuccess(r.Context(), file, threadID)
 	} else {
-		err = h.handleFailed(r.Context(), file)
+		err = h.handleFailed(r.Context(), file, threadID)
 	}
 
 	if err != nil {
@@ -55,14 +60,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (h *Handler) handleSuccess(ctx context.Context, file string) error {
+func (h *Handler) handleSuccess(ctx context.Context, file string, threadID string) error {
 	lines, err := h.reader.ReadTextLines(ctx, file)
 	if err != nil {
 		return err
 	}
 
 	if len(lines) == 0 {
-		return h.client.SendTextMessage(ctx, "File is empty")
+		return h.client.SendTextMessage(ctx, "File is empty", threadID)
 	}
 
 	batch := h.cfg.BatchLineCount
@@ -84,7 +89,7 @@ func (h *Handler) handleSuccess(ctx context.Context, file string) error {
 			content += line
 		}
 
-		if err := h.client.SendTextMessage(ctx, content); err != nil {
+		if err := h.client.SendTextMessage(ctx, content, threadID); err != nil {
 			return err
 		}
 	}
@@ -92,7 +97,7 @@ func (h *Handler) handleSuccess(ctx context.Context, file string) error {
 	return nil
 }
 
-func (h *Handler) handleFailed(ctx context.Context, file string) error {
+func (h *Handler) handleFailed(ctx context.Context, file string, threadID string) error {
 	var payload model.FailedPayload
 	if err := h.reader.ReadJSON(ctx, file, &payload); err != nil {
 		return err
@@ -121,7 +126,7 @@ func (h *Handler) handleFailed(ctx context.Context, file string) error {
 		Name: "Error Message", Value: payload.Message, Inline: false,
 	})
 
-	return h.client.SendEmbed(ctx, embed)
+	return h.client.SendEmbed(ctx, embed, threadID)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data any) {

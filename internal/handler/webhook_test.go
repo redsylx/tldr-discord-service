@@ -40,12 +40,12 @@ type mockDiscordClient struct {
 	sendErr   error
 }
 
-func (m *mockDiscordClient) SendTextMessage(ctx context.Context, content string) error {
+func (m *mockDiscordClient) SendTextMessage(ctx context.Context, content string, threadID string) error {
 	m.sentTexts = append(m.sentTexts, content)
 	return m.sendErr
 }
 
-func (m *mockDiscordClient) SendEmbed(ctx context.Context, embed model.Embed) error {
+func (m *mockDiscordClient) SendEmbed(ctx context.Context, embed model.Embed, threadID string) error {
 	m.sentEmbeds = append(m.sentEmbeds, embed)
 	return m.sendErr
 }
@@ -70,7 +70,7 @@ func TestHandler_MethodNotAllowed(t *testing.T) {
 
 func TestHandler_MissingFile(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
-	req := httptest.NewRequest(http.MethodPost, "/webhook?type=success", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?type=success&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -81,7 +81,7 @@ func TestHandler_MissingFile(t *testing.T) {
 
 func TestHandler_InvalidType(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=invalid", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=invalid&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -94,7 +94,7 @@ func TestHandler_Success_SendsBatches(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{lines: []string{"a", "b", "c", "d", "e"}}, mock, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=success", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=success&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -117,7 +117,7 @@ func TestHandler_Success_EmptyFile(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{lines: []string{}}, mock, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=empty.txt&type=success", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=empty.txt&type=success&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -136,7 +136,7 @@ func TestHandler_Success_EmptyFile(t *testing.T) {
 func TestHandler_Success_GCSError(t *testing.T) {
 	h := New(&mockGCSReader{readErr: errors.New("gcs error")}, &mockDiscordClient{}, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=success", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=test.txt&type=success&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -159,7 +159,7 @@ func TestHandler_Failed_SendsEmbed(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{jsonData: payload}, mock, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -187,7 +187,7 @@ func TestHandler_Failed_ValidationError(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{jsonData: model.FailedPayload{}}, mock, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -203,7 +203,7 @@ func TestHandler_Failed_GCSError(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{readErr: errors.New("gcs error")}, mock, cfg())
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhook?file=fail.json&type=failed&thread_id=123", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 

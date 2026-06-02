@@ -11,8 +11,9 @@ type Config struct {
 }
 
 type WebhookParams struct {
-	File string
-	Type string
+	File     string
+	Type     string
+	ThreadID string
 }
 
 type TraceInfo struct {

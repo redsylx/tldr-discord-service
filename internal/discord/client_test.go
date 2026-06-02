@@ -19,7 +19,7 @@ func TestSendTextMessage_Success(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL, 0)
-	err := c.SendTextMessage(context.Background(), "hello world")
+	err := c.SendTextMessage(context.Background(), "hello world", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestSendTextMessage_NonOKStatus(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL, 0)
-	err := c.SendTextMessage(context.Background(), "hello")
+	err := c.SendTextMessage(context.Background(), "hello", "")
 	if err == nil {
 		t.Fatal("expected error for non-2xx status")
 	}
@@ -57,7 +57,7 @@ func TestSendEmbed_Success(t *testing.T) {
 			{Name: "Key", Value: "Val", Inline: true},
 		},
 	}
-	err := c.SendEmbed(context.Background(), embed)
+	err := c.SendEmbed(context.Background(), embed, "")
 	if err != nil {
 		t.Fatal(err)
 	}
