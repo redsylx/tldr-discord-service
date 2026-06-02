@@ -43,29 +43,14 @@ func (c *discordClient) SendEmbed(ctx context.Context, embed model.Embed, thread
 }
 
 func (c *discordClient) CreateThread(ctx context.Context, title string, description string, tags []string) (string, error) {
-	embed := model.Embed{
-		Title: title,
-		Color: 0x5865F2,
-		Fields: []model.Field{
-			{Name: "Description", Value: description, Inline: false},
-		},
-	}
-	if len(tags) > 0 {
-		var tagStr string
-		for i, tag := range tags {
-			if i > 0 {
-				tagStr += ", "
-			}
-			tagStr += "`" + tag + "`"
-		}
-		embed.Fields = append(embed.Fields, model.Field{
-			Name: "Tags", Value: tagStr, Inline: false,
-		})
-	}
-
 	payload := map[string]any{
 		"thread_name": title,
-		"embeds":      []model.Embed{embed},
+		"content":     description,
+	}
+	if len(tags) > 0 {
+		appliedTags := make([]string, len(tags))
+		copy(appliedTags, tags)
+		payload["applied_tags"] = appliedTags
 	}
 
 	body, err := json.Marshal(payload)

@@ -1,6 +1,9 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type Config struct {
 	Port            string
@@ -50,12 +53,36 @@ type ForumResponse struct {
 	ThreadID string `json:"thread_id"`
 }
 
+var TagPresets = map[string]string{
+	"p1": "1511311266935738478",
+	"p2": "1511311288922275840",
+	"p3": "1511314922540240936",
+	"p4": "1511314957919195268",
+}
+
+var ValidTagIDs map[string]bool
+
+func init() {
+	ValidTagIDs = make(map[string]bool, len(TagPresets))
+	for _, id := range TagPresets {
+		ValidTagIDs[id] = true
+	}
+}
+
 func ValidateCreateForumRequest(req CreateForumRequest) error {
 	if req.Title == "" {
 		return errors.New("title is required")
 	}
 	if req.Description == "" {
 		return errors.New("desc is required")
+	}
+	if len(req.Tags) > 4 {
+		return errors.New("max 4 tags allowed")
+	}
+	for _, tag := range req.Tags {
+		if !ValidTagIDs[tag] {
+			return fmt.Errorf("invalid tag ID: %s", tag)
+		}
 	}
 	return nil
 }

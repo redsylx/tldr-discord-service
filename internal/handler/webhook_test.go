@@ -233,7 +233,7 @@ func TestForumHandler_Success(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{}, mock, cfg())
 
-	body := `{"title":"Test Post","desc":"Test description","tags":["tag1","tag2"]}`
+	body := `{"title":"Test Post","desc":"Test description","tags":["1511311266935738478","1511311288922275840"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -257,7 +257,7 @@ func TestForumHandler_Success(t *testing.T) {
 	if mock.createdThreads[0].Title != "Test Post" {
 		t.Errorf("expected 'Test Post', got %q", mock.createdThreads[0].Title)
 	}
-	if len(mock.createdThreads[0].Tags) != 2 || mock.createdThreads[0].Tags[0] != "tag1" {
+	if len(mock.createdThreads[0].Tags) != 2 || mock.createdThreads[0].Tags[0] != "1511311266935738478" {
 		t.Errorf("unexpected tags: %v", mock.createdThreads[0].Tags)
 	}
 }
@@ -265,7 +265,7 @@ func TestForumHandler_Success(t *testing.T) {
 func TestForumHandler_MissingTitle(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
 
-	body := `{"desc":"Test description","tags":["tag1"]}`
+	body := `{"desc":"Test description","tags":["1511311266935738478"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -279,7 +279,7 @@ func TestForumHandler_MissingTitle(t *testing.T) {
 func TestForumHandler_MissingDescription(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
 
-	body := `{"title":"Test Post","tags":["tag1"]}`
+	body := `{"title":"Test Post","tags":["1511311266935738478"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -308,7 +308,7 @@ func TestForumHandler_ClientError(t *testing.T) {
 	mock := &mockDiscordClient{sendErr: errors.New("discord error")}
 	h := New(&mockGCSReader{}, mock, cfg())
 
-	body := `{"title":"Test Post","desc":"Test description","tags":["tag1"]}`
+	body := `{"title":"Test Post","desc":"Test description","tags":["1511311266935738478"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -316,5 +316,55 @@ func TestForumHandler_ClientError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+}
+
+func TestForumHandler_TooManyTags(t *testing.T) {
+	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
+
+	body := `{"title":"Test","desc":"Test","tags":["1511311266935738478","1511311288922275840","1511314922540240936","1511314957919195268","1511311266935738478"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForumHandler_InvalidTagID(t *testing.T) {
+	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
+
+	body := `{"title":"Test","desc":"Test","tags":["invalid-tag"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForumHandler_NoTags(t *testing.T) {
+	mock := &mockDiscordClient{}
+	h := New(&mockGCSReader{}, mock, cfg())
+
+	body := `{"title":"No Tags","desc":"No tags description"}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if len(mock.createdThreads) != 1 {
+		t.Fatalf("expected 1 thread creation, got %d", len(mock.createdThreads))
+	}
+	if len(mock.createdThreads[0].Tags) != 0 {
+		t.Errorf("expected no tags, got %v", mock.createdThreads[0].Tags)
 	}
 }
