@@ -20,7 +20,7 @@ func (h *Handler) HandleForum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	threadID, err := h.client.CreateThread(r.Context(), req.Title, req.Description, req.Tags)
+	threadID, err := h.client.CreateThread(r.Context(), req.Title, req.Description, req.URL, req.Read, req.Tags)
 	if err != nil {
 		slog.Error("forum handler error", "err", err)
 		respondError(w, http.StatusInternalServerError, err.Error())

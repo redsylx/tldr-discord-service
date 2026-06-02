@@ -38,15 +38,19 @@ type Field struct {
 }
 
 type Embed struct {
-	Title  string  `json:"title"`
-	Color  int     `json:"color"`
-	Fields []Field `json:"fields"`
+	Title       string  `json:"title"`
+	URL         string  `json:"url,omitempty"`
+	Description string  `json:"description,omitempty"`
+	Color       int     `json:"color"`
+	Fields      []Field `json:"fields,omitempty"`
 }
 
 type CreateForumRequest struct {
 	Title       string   `json:"title"`
 	Description string   `json:"desc"`
 	Tags        []string `json:"tags"`
+	URL         string   `json:"url"`
+	Read        int      `json:"read"`
 }
 
 type ForumResponse struct {

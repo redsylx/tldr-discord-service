@@ -44,6 +44,8 @@ type mockDiscordClient struct {
 type createThreadCall struct {
 	Title       string
 	Description string
+	URL         string
+	Read        int
 	Tags        []string
 }
 
@@ -57,9 +59,9 @@ func (m *mockDiscordClient) SendEmbed(ctx context.Context, embed model.Embed, th
 	return m.sendErr
 }
 
-func (m *mockDiscordClient) CreateThread(ctx context.Context, title string, description string, tags []string) (string, error) {
+func (m *mockDiscordClient) CreateThread(ctx context.Context, title string, description string, linkURL string, read int, tags []string) (string, error) {
 	m.createdThreads = append(m.createdThreads, createThreadCall{
-		Title: title, Description: description, Tags: tags,
+		Title: title, Description: description, URL: linkURL, Read: read, Tags: tags,
 	})
 	return "thread-123", m.sendErr
 }
@@ -233,7 +235,7 @@ func TestForumHandler_Success(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{}, mock, cfg())
 
-	body := `{"title":"Test Post","desc":"Test description","tags":["1511311266935738478","1511311288922275840"]}`
+	body := `{"title":"Test Post","desc":"Test description","url":"https://example.com","read":5,"tags":["1511311266935738478","1511311288922275840"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -256,6 +258,12 @@ func TestForumHandler_Success(t *testing.T) {
 	}
 	if mock.createdThreads[0].Title != "Test Post" {
 		t.Errorf("expected 'Test Post', got %q", mock.createdThreads[0].Title)
+	}
+	if mock.createdThreads[0].URL != "https://example.com" {
+		t.Errorf("expected 'https://example.com', got %q", mock.createdThreads[0].URL)
+	}
+	if mock.createdThreads[0].Read != 5 {
+		t.Errorf("expected 5, got %d", mock.createdThreads[0].Read)
 	}
 	if len(mock.createdThreads[0].Tags) != 2 || mock.createdThreads[0].Tags[0] != "1511311266935738478" {
 		t.Errorf("unexpected tags: %v", mock.createdThreads[0].Tags)
@@ -308,7 +316,7 @@ func TestForumHandler_ClientError(t *testing.T) {
 	mock := &mockDiscordClient{sendErr: errors.New("discord error")}
 	h := New(&mockGCSReader{}, mock, cfg())
 
-	body := `{"title":"Test Post","desc":"Test description","tags":["1511311266935738478"]}`
+	body := `{"title":"Test Post","desc":"Test description","url":"https://example.com","read":3,"tags":["1511311266935738478"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -322,7 +330,7 @@ func TestForumHandler_ClientError(t *testing.T) {
 func TestForumHandler_TooManyTags(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
 
-	body := `{"title":"Test","desc":"Test","tags":["1511311266935738478","1511311288922275840","1511314922540240936","1511314957919195268","1511311266935738478"]}`
+	body := `{"title":"Test","desc":"Test","url":"https://example.com","read":1,"tags":["1511311266935738478","1511311288922275840","1511314922540240936","1511314957919195268","1511311266935738478"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -336,7 +344,7 @@ func TestForumHandler_TooManyTags(t *testing.T) {
 func TestForumHandler_InvalidTagID(t *testing.T) {
 	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
 
-	body := `{"title":"Test","desc":"Test","tags":["invalid-tag"]}`
+	body := `{"title":"Test","desc":"Test","url":"https://example.com","read":1,"tags":["invalid-tag"]}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -351,7 +359,7 @@ func TestForumHandler_NoTags(t *testing.T) {
 	mock := &mockDiscordClient{}
 	h := New(&mockGCSReader{}, mock, cfg())
 
-	body := `{"title":"No Tags","desc":"No tags description"}`
+	body := `{"title":"No Tags","desc":"No tags description","url":"https://example.com","read":3}`
 	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

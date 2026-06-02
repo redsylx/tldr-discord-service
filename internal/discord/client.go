@@ -15,7 +15,7 @@ import (
 type Client interface {
 	SendTextMessage(ctx context.Context, content string, threadID string) error
 	SendEmbed(ctx context.Context, embed model.Embed, threadID string) error
-	CreateThread(ctx context.Context, title string, description string, tags []string) (string, error)
+	CreateThread(ctx context.Context, title string, description string, linkURL string, read int, tags []string) (string, error)
 }
 
 func NewClient(webhookURL string, delayMs int) Client {
@@ -42,10 +42,22 @@ func (c *discordClient) SendEmbed(ctx context.Context, embed model.Embed, thread
 	return c.send(ctx, payload, threadID)
 }
 
-func (c *discordClient) CreateThread(ctx context.Context, title string, description string, tags []string) (string, error) {
+func (c *discordClient) CreateThread(ctx context.Context, title string, description string, linkURL string, read int, tags []string) (string, error) {
+	embed := model.Embed{
+		Title:       title,
+		URL:         linkURL,
+		Description: description,
+		Color:       0x5865F2,
+	}
+	if read > 0 {
+		embed.Fields = []model.Field{
+			{Name: "Estimated Reading Time", Value: fmt.Sprintf("%dm", read), Inline: true},
+		}
+	}
+
 	payload := map[string]any{
 		"thread_name": title,
-		"content":     description,
+		"embeds":      []model.Embed{embed},
 	}
 	if len(tags) > 0 {
 		appliedTags := make([]string, len(tags))
