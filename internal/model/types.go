@@ -40,6 +40,26 @@ type Embed struct {
 	Fields []Field `json:"fields"`
 }
 
+type CreateForumRequest struct {
+	Title       string   `json:"title"`
+	Description string   `json:"desc"`
+	Tags        []string `json:"tags"`
+}
+
+type ForumResponse struct {
+	ThreadID string `json:"thread_id"`
+}
+
+func ValidateCreateForumRequest(req CreateForumRequest) error {
+	if req.Title == "" {
+		return errors.New("title is required")
+	}
+	if req.Description == "" {
+		return errors.New("desc is required")
+	}
+	return nil
+}
+
 func ValidateFailedPayload(p FailedPayload) error {
 	if p.ProcessName == "" {
 		return errors.New("processName is required")

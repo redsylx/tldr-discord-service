@@ -35,9 +35,16 @@ func (m *mockGCSReader) ReadJSON(ctx context.Context, path string, dst any) erro
 }
 
 type mockDiscordClient struct {
-	sentTexts []string
+	sentTexts  []string
 	sentEmbeds []model.Embed
-	sendErr   error
+	createdThreads []createThreadCall
+	sendErr    error
+}
+
+type createThreadCall struct {
+	Title       string
+	Description string
+	Tags        []string
 }
 
 func (m *mockDiscordClient) SendTextMessage(ctx context.Context, content string, threadID string) error {
@@ -48,6 +55,13 @@ func (m *mockDiscordClient) SendTextMessage(ctx context.Context, content string,
 func (m *mockDiscordClient) SendEmbed(ctx context.Context, embed model.Embed, threadID string) error {
 	m.sentEmbeds = append(m.sentEmbeds, embed)
 	return m.sendErr
+}
+
+func (m *mockDiscordClient) CreateThread(ctx context.Context, title string, description string, tags []string) (string, error) {
+	m.createdThreads = append(m.createdThreads, createThreadCall{
+		Title: title, Description: description, Tags: tags,
+	})
+	return "thread-123", m.sendErr
 }
 
 func cfg() model.Config {
@@ -212,5 +226,95 @@ func TestHandler_Failed_GCSError(t *testing.T) {
 	}
 	if len(mock.sentEmbeds) != 0 {
 		t.Error("expected no embed sent on GCS error")
+	}
+}
+
+func TestForumHandler_Success(t *testing.T) {
+	mock := &mockDiscordClient{}
+	h := New(&mockGCSReader{}, mock, cfg())
+
+	body := `{"title":"Test Post","desc":"Test description","tags":["tag1","tag2"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp model.ForumResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ThreadID != "thread-123" {
+		t.Errorf("expected thread-123, got %q", resp.ThreadID)
+	}
+
+	if len(mock.createdThreads) != 1 {
+		t.Fatalf("expected 1 thread creation, got %d", len(mock.createdThreads))
+	}
+	if mock.createdThreads[0].Title != "Test Post" {
+		t.Errorf("expected 'Test Post', got %q", mock.createdThreads[0].Title)
+	}
+	if len(mock.createdThreads[0].Tags) != 2 || mock.createdThreads[0].Tags[0] != "tag1" {
+		t.Errorf("unexpected tags: %v", mock.createdThreads[0].Tags)
+	}
+}
+
+func TestForumHandler_MissingTitle(t *testing.T) {
+	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
+
+	body := `{"desc":"Test description","tags":["tag1"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForumHandler_MissingDescription(t *testing.T) {
+	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
+
+	body := `{"title":"Test Post","tags":["tag1"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForumHandler_InvalidJSON(t *testing.T) {
+	h := New(&mockGCSReader{}, &mockDiscordClient{}, cfg())
+
+	body := `{invalid json}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForumHandler_ClientError(t *testing.T) {
+	mock := &mockDiscordClient{sendErr: errors.New("discord error")}
+	h := New(&mockGCSReader{}, mock, cfg())
+
+	body := `{"title":"Test Post","desc":"Test description","tags":["tag1"]}`
+	req := httptest.NewRequest(http.MethodPost, "/forum", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.HandleForum(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 	}
 }

@@ -15,6 +15,7 @@ import (
 type Client interface {
 	SendTextMessage(ctx context.Context, content string, threadID string) error
 	SendEmbed(ctx context.Context, embed model.Embed, threadID string) error
+	CreateThread(ctx context.Context, title string, description string, tags []string) (string, error)
 }
 
 func NewClient(webhookURL string, delayMs int) Client {
@@ -39,6 +40,78 @@ func (c *discordClient) SendTextMessage(ctx context.Context, content string, thr
 func (c *discordClient) SendEmbed(ctx context.Context, embed model.Embed, threadID string) error {
 	payload := map[string]any{"embeds": []model.Embed{embed}}
 	return c.send(ctx, payload, threadID)
+}
+
+func (c *discordClient) CreateThread(ctx context.Context, title string, description string, tags []string) (string, error) {
+	embed := model.Embed{
+		Title: title,
+		Color: 0x5865F2,
+		Fields: []model.Field{
+			{Name: "Description", Value: description, Inline: false},
+		},
+	}
+	if len(tags) > 0 {
+		var tagStr string
+		for i, tag := range tags {
+			if i > 0 {
+				tagStr += ", "
+			}
+			tagStr += "`" + tag + "`"
+		}
+		embed.Fields = append(embed.Fields, model.Field{
+			Name: "Tags", Value: tagStr, Inline: false,
+		})
+	}
+
+	payload := map[string]any{
+		"thread_name": title,
+		"embeds":      []model.Embed{embed},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("discord: marshal payload: %w", err)
+	}
+
+	u, parseErr := url.Parse(c.webhookURL)
+	if parseErr != nil {
+		return "", fmt.Errorf("discord: parse webhook URL: %w", parseErr)
+	}
+	q := u.Query()
+	q.Set("wait", "true")
+	u.RawQuery = q.Encode()
+	urlStr := u.String()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("discord: create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("discord: send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("discord: unexpected status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		ChannelID string `json:"channel_id"`
+		Thread    *struct {
+			ID string `json:"id"`
+		} `json:"thread"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("discord: decode response: %w", err)
+	}
+
+	if result.Thread != nil && result.Thread.ID != "" {
+		return result.Thread.ID, nil
+	}
+	return result.ChannelID, nil
 }
 
 func (c *discordClient) send(ctx context.Context, payload any, threadID string) error {
