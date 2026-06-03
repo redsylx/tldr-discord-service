@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"unicode/utf8"
 
 	"github.com/redsylx/tldr-discord-service/internal/model"
 )
@@ -55,8 +56,14 @@ func (c *discordClient) CreateThread(ctx context.Context, title string, descript
 		}
 	}
 
+	threadName := title
+	if utf8.RuneCountInString(threadName) > 100 {
+		runes := []rune(threadName)
+		threadName = string(runes[:100])
+	}
+
 	payload := map[string]any{
-		"thread_name": title,
+		"thread_name": threadName,
 		"embeds":      []model.Embed{embed},
 	}
 	if len(tags) > 0 {
