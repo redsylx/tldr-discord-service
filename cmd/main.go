@@ -107,6 +107,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/webhook", webhookHandler)
 	mux.HandleFunc("POST /forum", webhookHandler.HandleForum)
+	mux.HandleFunc("POST /process", webhookHandler.HandleProcess)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

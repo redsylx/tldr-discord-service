@@ -34,6 +34,18 @@ func (m *mockGCSReader) ReadJSON(ctx context.Context, path string, dst any) erro
 	return json.Unmarshal(data, dst)
 }
 
+func (m *mockGCSReader) StreamLines(ctx context.Context, path string, fn func(line string) error) error {
+	if m.readErr != nil {
+		return m.readErr
+	}
+	for _, line := range m.lines {
+		if err := fn(line); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type mockDiscordClient struct {
 	sentTexts  []string
 	sentEmbeds []model.Embed

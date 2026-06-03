@@ -1,6 +1,7 @@
 package gcs
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,6 +16,7 @@ type Reader interface {
 	ReadFile(ctx context.Context, path string) ([]byte, error)
 	ReadTextLines(ctx context.Context, path string) ([]string, error)
 	ReadJSON(ctx context.Context, path string, dst any) error
+	StreamLines(ctx context.Context, path string, fn func(line string) error) error
 }
 
 func NewReader(client *storage.Client, bucketName string) Reader {
@@ -78,6 +80,31 @@ func (r *gcsReader) ReadJSON(ctx context.Context, path string, dst any) error {
 
 	if err := json.Unmarshal(data, dst); err != nil {
 		return fmt.Errorf("gcs: parse JSON from %s/%s: %w", r.bucket, path, err)
+	}
+	return nil
+}
+
+func (r *gcsReader) StreamLines(ctx context.Context, path string, fn func(line string) error) error {
+	obj := r.client.Bucket(r.bucket).Object(path)
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("gcs: open object %s/%s: %w", r.bucket, path, err)
+	}
+	defer reader.Close()
+
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !utf8.ValidString(line) {
+			return fmt.Errorf("gcs: file %s/%s is not valid UTF-8", r.bucket, path)
+		}
+		line = strings.TrimRight(line, "\r")
+		if err := fn(line); err != nil {
+			return err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("gcs: scan object %s/%s: %w", r.bucket, path, err)
 	}
 	return nil
 }
