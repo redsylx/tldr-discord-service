@@ -122,11 +122,20 @@ components:
         tags:
           type: array
           description: |
-            Array ID tag Discord (snowflake).
-            Maksimal 4 tag, harus sesuai preset yang terdaftar.
+            Array ID tag Discord (snowflake). Maksimal 4 tag.
+
+            Preset tag ID yang tersedia:
+            - `p1` = `1511311266935738478`
+            - `p2` = `1511311288922275840`
+            - `p3` = `1511314922540240936`
+            - `p4` = `1511314957919195268`
           items:
             type: string
-            pattern: "^[0-9]{17,20}$"
+            enum:
+              - "1511311266935738478"
+              - "1511311288922275840"
+              - "1511314922540240936"
+              - "1511314957919195268"
           maxItems: 4
           example:
             - "1511311266935738478"
